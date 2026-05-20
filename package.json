@@ -9,6 +9,14 @@
   "files": [
     "bin"
   ],
-  "keywords": ["cli", "vite", "tailwind", "scaffold"],
-  "license": "MIT"
+  "keywords": [
+    "cli",
+    "vite",
+    "tailwind",
+    "scaffold"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "^1.4.0"
+  }
 }
