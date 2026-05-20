@@ -3,6 +3,7 @@
 import * as p from '@clack/prompts';
 import { spawn } from 'child_process';
 import { rm, readFile, writeFile } from 'fs/promises';
+import { existsSync } from 'fs';
 import { join } from 'path';
 
 p.intro('mkapp — frontend project scaffolder');
@@ -45,20 +46,30 @@ const answers = await p.group(
 
 const { projectName, framework, variant } = answers;
 
-p.log.step(`Scaffolding ${projectName} with Vite...`);
-await runCommand(
-  'npm',
-  ['create', 'vite@latest', projectName, '--', '--template', variant],
-  { pipeInput: 'n\n' },
-);
+if (existsSync(join(process.cwd(), projectName))) {
+  p.cancel(`A directory named "${projectName}" already exists. Choose a different name.`);
+  process.exit(1);
+}
 
-p.log.step('Cleaning up boilerplate...');
-await cleanupBoilerplate(projectName, framework, variant);
+try {
+  p.log.step(`Scaffolding ${projectName} with Vite...`);
+  await runCommand(
+    'npm',
+    ['create', 'vite@latest', projectName, '--', '--template', variant],
+    { pipeInput: 'n\n' },
+  );
 
-p.log.step('Installing dependencies and configuring Tailwind CSS...');
-await installTailwind(projectName, framework, variant);
+  p.log.step('Cleaning up boilerplate...');
+  await cleanupBoilerplate(projectName, framework, variant);
 
-p.outro(`Done! cd ${projectName} && npm run dev`);
+  p.log.step('Installing dependencies and configuring Tailwind CSS...');
+  await installTailwind(projectName, framework, variant);
+
+  p.outro(`Done! cd ${projectName} && npm run dev`);
+} catch (err) {
+  p.cancel(`Something went wrong: ${err.message}`);
+  process.exit(1);
+}
 
 // --- helpers ---
 
