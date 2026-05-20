@@ -1,5 +1,5 @@
 {
-  "name": "mkapp",
+  "name": "scaffvite",
   "version": "1.0.0",
   "description": "A CLI tool to scaffold frontend projects with Vite and Tailwind CSS",
   "type": "module",
