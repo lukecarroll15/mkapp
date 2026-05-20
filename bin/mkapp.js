@@ -46,7 +46,6 @@ const answers = await p.group(
 const { projectName, framework, variant } = answers;
 
 p.log.step(`Scaffolding ${projectName} with Vite...`);
-
 await runCommand(
   'npm',
   ['create', 'vite@latest', projectName, '--', '--template', variant],
@@ -56,7 +55,10 @@ await runCommand(
 p.log.step('Cleaning up boilerplate...');
 await cleanupBoilerplate(projectName, framework, variant);
 
-p.outro(`Done! Project created in ./${projectName}`);
+p.log.step('Installing dependencies and configuring Tailwind CSS...');
+await installTailwind(projectName, framework, variant);
+
+p.outro(`Done! cd ${projectName} && npm run dev`);
 
 // --- helpers ---
 
@@ -64,25 +66,61 @@ async function cleanupBoilerplate(projectName, framework, variant) {
   const root = join(process.cwd(), projectName);
   const isTs = variant.endsWith('-ts');
 
-  // Delete default asset files
   await rm(join(root, 'src', 'assets'), { recursive: true, force: true });
   await rm(join(root, 'public', 'vite.svg'), { force: true });
 
-  // Clear CSS files (index.css will get Tailwind directives in the next step)
   await writeFile(join(root, 'src', 'App.css'), '');
-  await writeFile(join(root, 'src', 'index.css'), '');
 
-  // Update index.html: remove favicon link, set title to project name
   const indexHtmlPath = join(root, 'index.html');
   let html = await readFile(indexHtmlPath, 'utf8');
   html = html.replace(/\s*<link rel="icon"[^>]*>\n?/g, '\n');
   html = html.replace(/<title>.*?<\/title>/, `<title>${projectName}</title>`);
   await writeFile(indexHtmlPath, html);
 
-  // Rewrite the root app component
   const appFilename = getAppFilename(framework, isTs);
   const appContent = getAppTemplate(framework, isTs);
   await writeFile(join(root, 'src', appFilename), appContent);
+}
+
+async function installTailwind(projectName, framework, variant) {
+  const root = join(process.cwd(), projectName);
+  const isTs = variant.endsWith('-ts');
+
+  // Install project deps + tailwind in one pass
+  await runCommand(
+    'npm',
+    ['install', '-D', 'tailwindcss', '@tailwindcss/vite'],
+    { cwd: root },
+  );
+
+  // Add tailwind plugin to vite config
+  const configExt = isTs ? 'ts' : 'js';
+  await writeFile(join(root, `vite.config.${configExt}`), getViteConfig(framework));
+
+  // Replace index.css with tailwind import
+  await writeFile(join(root, 'src', 'index.css'), '@import "tailwindcss";\n');
+}
+
+function getViteConfig(framework) {
+  const plugins = {
+    react:   [`import react from '@vitejs/plugin-react'`,   'react()'],
+    vue:     [`import vue from '@vitejs/plugin-vue'`,        'vue()'],
+    svelte:  [`import { svelte } from '@sveltejs/vite-plugin-svelte'`, 'svelte()'],
+    preact:  [`import preact from '@preact/preset-vite'`,    'preact()'],
+  };
+  const [importLine, pluginCall] = plugins[framework];
+
+  return `import { defineConfig } from 'vite'
+${importLine}
+import tailwindcss from '@tailwindcss/vite'
+
+export default defineConfig({
+  plugins: [
+    tailwindcss(),
+    ${pluginCall},
+  ],
+})
+`;
 }
 
 function getAppFilename(framework, isTs) {
@@ -109,7 +147,6 @@ function getAppTemplate(framework, isTs) {
 `;
   }
 
-  // React / Preact
   return `export default function App() {
   return (
     <div>
@@ -130,10 +167,10 @@ function getVariants(framework) {
   return variants[framework] ?? [];
 }
 
-function runCommand(command, args, { pipeInput } = {}) {
+function runCommand(command, args, { pipeInput, cwd } = {}) {
   return new Promise((resolve, reject) => {
     const stdio = pipeInput ? ['pipe', 'inherit', 'inherit'] : 'inherit';
-    const child = spawn(command, args, { stdio, shell: true });
+    const child = spawn(command, args, { stdio, shell: true, ...(cwd && { cwd }) });
     if (pipeInput) {
       child.stdin.write(pipeInput);
       child.stdin.end();
