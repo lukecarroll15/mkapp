@@ -4,7 +4,7 @@
   "description": "A CLI tool to scaffold frontend projects with Vite and Tailwind CSS",
   "type": "module",
   "bin": {
-    "mkapp": "./bin/mkapp.js"
+    "scaffvite": "./bin/mkapp.js"
   },
   "files": [
     "bin"
